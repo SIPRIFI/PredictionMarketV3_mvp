@@ -1,47 +1,41 @@
 const hre = require("hardhat");
 
 async function main() {
-  console.log("\n🚀 Deploying Siprifi Finance MVP v3.0...\n");
+  const [deployer] = await hre.ethers.getSigners();
+  console.log("Desplegando contratos con la cuenta:", deployer.address);
 
-  // ===== 1. DEPLOY SIPRIFI STUB =====
-  console.log("📦 Deploying SiprifiStub...");
-  const SiprifiStub = await hre.ethers.getContractFactory("SiprifiStub");
-  const siprifiStub = await SiprifiStub.deploy();
-  await siprifiStub.waitForDeployment();
-  
-  const siprifiAddress = await siprifiStub.getAddress();
-  console.log(`✅ SiprifiStub: ${siprifiAddress}`);
+  // 1. Desplegar el Motor de Riesgo (Risk Engine)
+  const RiskEngine = await hre.ethers.getContractFactory("SiprifiRiskEngine");
+  const riskEngine = await RiskEngine.deploy();
+  await riskEngine.waitForDeployment();
+  console.log("SiprifiRiskEngine desplegado en:", await riskEngine.getAddress());
 
-  // ===== 2. DEPLOY PREDICTION MARKET V3 =====
-  console.log("\n🏪 Deploying PredictionMarket_V3...");
-  const PredictionMarketV3 = await hre.ethers.getContractFactory("PredictionMarket_V3");
-  const predictionMarket = await PredictionMarketV3.deploy(siprifiAddress);
-  await predictionMarket.waitForDeployment();
-  
-  const marketAddress = await predictionMarket.getAddress();
-  console.log(`✅ PredictionMarket_V3: ${marketAddress}`);
+  // 2. Desplegar la Fábrica de Mercados (Prediction Market)
+  const PredictionMarket = await hre.ethers.getContractFactory("PredictionMarketV2");
+  const market = await PredictionMarket.deploy();
+  await market.waitForDeployment();
+  console.log("PredictionMarketV2 desplegado en:", await market.getAddress());
 
-  // ===== 3. SAVE ADDRESSES =====
-  const addresses = {
-    siprifiStub: siprifiAddress,
-    predictionMarketV3: marketAddress,
-    deployedAt: new Date().toISOString()
-  };
-  
-  const fs = require('fs');
-  fs.writeFileSync('./deployed-addresses.json', JSON.stringify(addresses, null, 2));
-  
-  console.log("\n📋 Contract Addresses:");
-  console.log("════════════════════════════════");
-  console.log(`SiprifiStub:         ${siprifiAddress}`);
-  console.log(`PredictionMarket_V3: ${marketAddress}`);
-  console.log(`\n💾 Addresses saved to deployed-addresses.json`);
-  console.log("\n✅ DEPLOYMENT COMPLETE!");
+  // 3. Desplegar el Vault de Colateral
+  const Vault = await hre.ethers.getContractFactory("SiprifiVault");
+  const vault = await Vault.deploy(await market.getAddress(), await riskEngine.getAddress());
+  await vault.waitForDeployment();
+  console.log("SiprifiVault desplegado en:", await vault.getAddress());
+
+  // 4. Configuración Crítica: Autorizar al Vault en el Mercado
+  await market.setVault(await vault.getAddress());
+  console.log("Vault autorizado en el Mercado.");
+
+  // 5. Desplegar el sistema de Préstamos (Lending)
+  const Lending = await hre.ethers.getContractFactory("SiprifiLending");
+  const lending = await Lending.deploy(await vault.getAddress());
+  await lending.waitForDeployment();
+  console.log("SiprifiLending desplegado en:", await lending.getAddress());
+
+  console.log("\n--- Despliegue Completo ---");
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error("❌ Deployment failed:", error);
-    process.exit(1);
-  });
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
