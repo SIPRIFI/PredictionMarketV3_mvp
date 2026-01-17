@@ -76,13 +76,13 @@ graph TB
     RESOLVE[resolveMarket]
     CLAIM[claimReward]
 
-    CREATE --> TOKENS[Deploy YES/NO Tokens]
+    CREATE --> TOKENS[Deploy YES and NO Tokens]
 
-    BUY --> MINT_YES[Mint YES → Buyer]
-    BUY --> MINT_NO[Mint NO → Market Owner]
-    BUY --> ESCROW[ETH Escrowed (per-market)]
+    BUY --> MINT_YES[Mint YES to Buyer]
+    BUY --> MINT_NO[Mint NO to Market Owner]
+    BUY --> ESCROW[ETH Escrowed Per Market]
 
-    RESOLVE --> OWNER[Owner / Resolver Authority]
+    RESOLVE --> OWNER[Owner Resolver Authority]
     OWNER --> OUTCOME[Outcome Stored]
 
     CLAIM --> BURN[Burn Winning Tokens]
@@ -90,6 +90,7 @@ graph TB
 
     style ESCROW fill:#FF9800
     style PAYOUT fill:#4CAF50
+
 ```
 
 ---
