@@ -1,308 +1,101 @@
-# Siprifi Prediction Market MVP – Architecture Review & Roadmap
+# Siprifi Finance: Technical Function Documentation (MVP V2)
 
-**Document Version:** 3.0
-**Date:** 2026-01-16
-**Status:** MVP Technical Architecture (Pre-Lending Phase)
-
-```mermaid
-graph TB
-    subgraph "User Layer"
-        USER[User / Trader]
-        WALLET["EOA Wallet\n(MetaMask, Rabby)"]
-    end
-
-    subgraph "Frontend Layer"
-        UI[Minimal Web UI]
-        MARKET_LIST[Market List]
-        MARKET_VIEW[Market Detail]
-        CLAIM_UI[Claim Rewards UI]
-    end
-
-    subgraph "Ethereum / EVM"
-        PM[PredictionMarketV2]
-        YES[YES MarketToken]
-        NO[NO MarketToken]
-    end
-
-    USER --> WALLET
-    WALLET --> UI
-
-    UI --> MARKET_LIST
-    UI --> MARKET_VIEW
-    UI --> CLAIM_UI
-
-    UI -->|createMarket| PM
-    UI -->|buyYesShares| PM
-    UI -->|resolveMarket| PM
-    UI -->|claimReward| PM
-
-    PM -->|deploys| YES
-    PM -->|deploys| NO
-
-    style PM fill:#4CAF50
-    style YES fill:#2196F3
-    style NO fill:#F44336
-
-```
-
-### Architectural Intent
-
-This MVP implements the **risk tokenization layer** of Siprifi Finance.
-
-* Each prediction market is isolated
-* Risk is expressed as ERC20 YES / NO tokens
-* ETH is escrowed per market
-* No AMM, oracle, or lending logic is included
-
-> This is a **foundational primitive**, not the full Siprifi protocol.
+This document provides a detailed breakdown of the smart contract functions, their Solidity implementation, and their role within the Siprifi ecosystem.
 
 ---
 
-## 2. Core Contracts Overview
+## 1. PredictionMarketV2.sol
+This contract acts as the primary issuance layer where risk is tokenized into YES and NO shares.
 
-| Contract                 | Responsibility                                                  | Status      |
-| ------------------------ | --------------------------------------------------------------- | ----------- |
-| `PredictionMarketV2.sol` | Market lifecycle, per-market ETH escrow, resolution, payout     | Implemented |
-| `MarketToken.sol`        | ERC20 YES / NO outcome tokens (risk representation)             | Implemented |
+### `createMarket(string memory question, uint256 deadline)`
+* **Solidity Logic**: 
+    ```solidity
+    uint256 newMarketId = ++marketCount;
+    MarketToken yesToken = new MarketToken(string.concat("Siprifi YES ", idStr), "sYES", address(this));
+    MarketToken noToken = new MarketToken(string.concat("Siprifi NO ", idStr), "sNO", address(this));
+    markets[newMarketId] = Market({ ... });
+    ```
+* **Description**: Deploys two new ERC-20 contracts for every market. It initializes the market structure with a specific deadline. The contract itself becomes the "Owner" of these tokens to manage minting permissions.
 
----
+### `buyShares(uint256 marketId)`
+* **Solidity Logic**:
+    ```solidity
+    MarketToken(m.yesToken).mint(msg.sender, msg.value);
+    MarketToken(m.noToken).mint(m.owner, msg.value);
+    ```
+* **Description**: This is the core liquidity mechanism. When a speculator sends ETH to buy "YES" shares, the contract mints an equal amount of "NO" shares to the market creator (the protection issuer). The ETH remains escrowed in the contract as collateral.
 
-## 3. PredictionMarketV2 – Contract Architecture
-
-```mermaid
-graph TB
-    CREATE[createMarket]
-    BUY[buyYesShares]
-    RESOLVE[resolveMarket]
-    CLAIM[claimReward]
-
-    CREATE --> TOKENS[Deploy YES and NO Tokens]
-
-    BUY --> MINT_YES[Mint YES to Buyer]
-    BUY --> MINT_NO[Mint NO to Market Owner]
-    BUY --> ESCROW[ETH Escrowed Per Market]
-
-    RESOLVE --> OWNER[Owner Resolver Authority]
-    OWNER --> OUTCOME[Outcome Stored]
-
-    CLAIM --> BURN[Burn Winning Tokens]
-    CLAIM --> PAYOUT[ETH Payout]
-
-    style ESCROW fill:#FF9800
-    style PAYOUT fill:#4CAF50
-
-```
+### `resolveMarket(uint256 marketId, uint8 _outcome)`
+* **Solidity Logic**:
+    ```solidity
+    m.resolved = true;
+    m.outcome = _outcome;
+    m.status = MarketStatus.Occurred;
+    ```
+* **Description**: Sets the final result of the event (0 for NO, 1 for YES). This state change determines which token holders can eventually claim the underlying ETH.
 
 ---
 
-## 4. Market Lifecycle (MVP)
+## 2. SiprifiRiskEngine.sol
+The mathematical core that calculates borrowing limits based on portfolio diversification.
 
-```mermaid
-sequenceDiagram
-    participant Trader
-    participant UI
-    participant PM as PredictionMarketV2
-    participant Token as MarketToken
-    participant Owner
-
-    Trader->>UI: Browse market
-    Note over UI: Synthetic orderbook, pricing & charts (off-chain)
-
-    Trader->>UI: Confirm YES exposure
-    UI->>PM: buyYesShares()
-    PM->>Token: mint YES to trader
-    PM->>Token: mint NO to owner
-    Note over PM: ETH locked in per-market escrow
-
-    Note over UI: Synthetic trading continues off-chain until expiry
-
-    Owner->>UI: Resolve market (after deadline)
-    UI->>PM: resolveMarket(outcome)
-
-    Trader->>UI: Claim reward
-    UI->>PM: claimReward()
-    PM->>Token: burn winning tokens
-    PM->>Trader: Transfer ETH payout
-```
+### `calculateEBP(uint256 baseBorrowingPower, uint256[] memory groupValues)`
+* **Solidity Logic**:
+    ```solidity
+    uint256[] memory sorted = _sortDescending(groupValues);
+    for (uint256 i = 0; i < N && i < sorted.length; i++) {
+        concentrationOffset += sorted[i];
+    }
+    return (concentrationOffset >= baseBorrowingPower) ? 0 : baseBorrowingPower - concentrationOffset;
+    ```
+* **Description**: Takes the total potential borrowing power and subtracts the value of the `N` largest positions. This ensures that even if the user's biggest "Protection" fails (the event happens), the protocol remains over-collateralized.
 
 ---
 
-## 5. Economic Model (Current MVP)
+## 3. SiprifiVault.sol
+Manages the custody of NO shares and interfaces with the Risk Engine.
 
-### 5.1 Share Minting Logic
+### `depositCollateral(address token, uint256 amount)`
+* **Solidity Logic**:
+    ```solidity
+    IERC20(token).transferFrom(msg.sender, address(this), amount);
+    collateralBalance[msg.sender][token] += amount;
+    ```
+* **Description**: Transfers the user's NO shares into the Vault. These shares represent the "Insurance Policy" that will be used as collateral for a loan.
 
-| Action             | Result                       |
-| ------------------ | ---------------------------- |
-| Buy YES with X ETH | YES: X minted to buyer       |
-|                    | NO: X minted to market owner |
-|                    | ETH locked in escrow         |
-
-**Assumptions:**
-
-* Fixed 1:1 pricing
-* No dynamic probability
-* No liquidity curve
-
----
-
-### 5.2 Payout Formula
-
-```text
-payout = (marketEscrowETH × userWinningBalance) / totalWinningSupply
-```
-
-Properties:
-
-* Zero-sum per market
-* Proportional distribution
-* Deterministic
+### `getAccountEBP(address user, uint256[] memory currentPositionValues)`
+* **Solidity Logic**:
+    ```solidity
+    for (uint256 i = 0; i < currentPositionValues.length; i++) {
+        totalBasePower += (currentPositionValues[i] * 50) / 100;
+    }
+    return riskEngine.calculateEBP(totalBasePower, currentPositionValues);
+    ```
+* **Description**: Calculates the "Base Power" by applying a 50% LTV to the collateral value, then calls the Risk Engine to apply the Concentration Offset.
 
 ---
 
-## 6. Trust & Security Model (Explicit MVP Assumptions)
+## 4. SiprifiLending.sol
+The credit facility that issues the protocol's native stablecoin.
 
-### 6.1 Trust Assumptions
-
-| Component         | Trust Model         |
-| ----------------- | ------------------- |
-| Market Resolution | Fully trusted owner |
-| Pricing(On-chain) | Fixed mint ratio (YES/NO = 1:1)    |
-| Pricing(Off-Chain)| Synthetic, frontend-derived
-| Oracle            | None                |
-| Governance        | None                |
-
-> These assumptions are **intentional for MVP speed**.
-
----
-
-### 6.2 Known Security Gaps
-
-| Risk                   | Description                     |
-| ---------------------- | ------------------------------- |
-| Centralized resolution | Market owner resolves outcome without oracle or dispute mechanism   |
-| No reentrancy guard    | claimReward() lacks explicit ReentrancyGuard (mitigated by state updates) |
-| Shared ETH balance     | RESOLVED✅ Each market now has isolated escrow accounting|
-| No pause mechanism     | Contracts cannot be halted in emergencies     |
-| No dispute window      | Resolution is final once executed      |
+### `borrow(uint256 amount, uint256[] memory positionValues)`
+* **Solidity Logic**:
+    ```solidity
+    uint256 ebp = vault.getAccountEBP(msg.sender, positionValues);
+    require(userDebt[msg.sender] + amount <= ebp, "Insolvent: Exceeds EBP");
+    userDebt[msg.sender] += amount;
+    stablecoin.mint(msg.sender, amount);
+    ```
+* **Description**: Verifies the user's Effective Borrowing Power through the Vault. If the debt is within limits, it mints `sipUSD` directly to the user's wallet.
 
 ---
 
-## 7. Code Status Summary
+## Technical Specifications Summary
 
-### Implemented ✅
-
-* Market creation (factory-style, isolated markets)
-
-* Dual ERC20 outcome tokens (YES / NO)
-
-* Per-market ETH escrow (isolated, non-shared)
-
-* Outcome resolution (owner-driven)
-
-* Proportional payout with token burn
-
-* YES soulbound behavior (pre-resolution)
-
-* NO token collateral lifecycle (pre-resolution validity)
-
-* Transfer gating based on market state
-
-### Not Implemented ❌ (By Design)
-
-* AMM-based pricing
-
-* On-chain price discovery
-
-* Oracle-based resolution
-
-* Secondary on-chain trading
-
-* Automated market maker curves
-
-* Lending / borrowing engine
-
-* Liquidation logic
-
-* Dispute or challenge window
-
-Protocol fees
-
----
-
-## 8. Planned Short-Term Improvements (V1)
-
-| Priority  | Feature               | Status V3.0                  |
-| --------- | --------------------- | ---------------------------- |
-| 🔴 High   | Per-market escrow     | ✅ RESOLVED |
-| 🔴 High   | ReentrancyGuard       | ❌ Pending       |
-| 🟡 Medium | Permissioned resolver | ❌ Pending               |
-| 🟡 Medium | Dispute window        | ❌ Pending         |
-| 🟢 Low    | Market fees           | ❌ Pending           |
-
----
-
-## 9. Siprifi Finance Integration Roadmap
-
-### Phase 0 – Current (This Repo)
-
-* Risk tokenization
-* Binary outcome tokens
-* ETH-settled markets
-
-### Phase 1 – Collateral Acceptance
-
-* YES / NO tokens whitelisted
-* Oracle-based pricing
-* LTV parameters
-* Deposit-only lending
-
-### Phase 2 – Risk Engine
-
-* Concentration limits
-* Correlated market groups
-* Borrowing power offsets
-
-### Phase 3 – Full Protocol
-
-* Permissionless markets
-* DAO governance
-* Safety module
-* Cross-market liquidity
-
----
-
-## 10. How This MVP Fits the Whitepaper
-
-| Whitepaper Concept        | MVP Status                  |
-| ------------------------- | --------------------------- |
-| Outcome risk tokenization | ✅ Implemented              |
-| ERC20 outcome assets      | ✅ Implemented              |
-| Trustless settlement      | ✅ Implemented              |
-| Capital efficiency        | ❌ Not yet                  |
-| Lending                   | ❌ Future                   |
-| On-chain price discovery  | ❌ Explicitly excluded      |
-
-> This MVP validates **the atomic unit of Siprifi risk**.
-
----
-
-## 11. Deployment Notes
-
-* Target: Testnet only
-* Solidity: ^0.8.24
-* No audits
-* No upgradeability
-
----
-
-## 12. Disclaimer
-
-This code is experimental and unaudited.
-
-* No financial guarantees
-* No oracle protections
-* Use for research and prototyping only
-
----
-
-**© 2026 Siprifi Finance – Internal MVP Architecture Document**
+| Component | Technical Detail |
+| :--- | :--- |
+| **Token Standard** | ERC-20 (OpenZeppelin v5.0) |
+| **Ownership Logic** | `Ownable` pattern for administrative tasks (whitelisting, N-parameter). |
+| **Math** | Integer arithmetic with 18-decimal precision simulation. |
+| **Solvency Assumption** | Base Power minus N-Largest concentration risk. |
+| **Collateral Type** | NO Shares (backed by ETH in the Market contract). |
