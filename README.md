@@ -105,7 +105,7 @@ Once executed successfully, users can deposit this token as collateral.
 
 ---
 
-## addNoTokenToVault.js (manual mode - MVP 3)
+## scripts/addNoTokenToVault.js (manual mode - MVP 3)
 
 ```js
 const hre = require("hardhat");
