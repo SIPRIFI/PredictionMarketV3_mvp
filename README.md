@@ -1,4 +1,4 @@
-# Siprifi Finance: Technical Function Documentation (MVP V2)
+# Siprifi Finance: Technical Function Documentation (MVP V3)
 
 This document provides a detailed breakdown of the smart contract functions, their Solidity implementation, and their role within the Siprifi ecosystem.
 
