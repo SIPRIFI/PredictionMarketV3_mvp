@@ -148,7 +148,7 @@ This contract acts as the primary issuance layer where risk is tokenized into YE
 | Outcome risk tokenization | ✅ Implemented              |
 | ERC20 outcome assets      | ✅ Implemented              |
 | Trustless settlement      | ✅ Implemented              |
-| Capital efficiency        | ❌ Not yet                  |
+| Capital efficiency        | ✅ Medium                   |
 | Lending                   | ❌ Future                   |
 | On-chain price discovery  | ❌ Explicitly excluded      |
 
