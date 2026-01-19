@@ -22,10 +22,10 @@ contract SiprifiVault is Ownable {
     }
 
     function depositCollateral(address token, uint256 amount) external {
-        require(isWhitelisted[token], "Not whitelisted");
-        IERC20(token).transferFrom(msg.sender, address(this), amount);
-        collateralBalance[msg.sender][token] += amount;
-    }
+    // Remove require(isWhitelisted), any token will be able to deposit!
+    IERC20(token).transferFrom(msg.sender, address(this), amount);
+    collateralBalance[msg.sender][token] += amount;
+   }
 
     function getAccountEBP(address user, uint256[] memory currentPositionValues) public view returns (uint256) {
         uint256 totalBasePower = 0;
