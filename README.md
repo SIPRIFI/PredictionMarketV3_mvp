@@ -1,4 +1,4 @@
-# Siprifi Finance: Technical Function Documentation (MVP V2)
+# Siprifi Finance: Technical Function Documentation (MVP V3)
 
 This document provides a detailed breakdown of the smart contract functions, their Solidity implementation, and their role within the Siprifi ecosystem.
 
@@ -90,6 +90,57 @@ The credit facility that issues the protocol's native stablecoin.
 
 ---
 
+---
+
+## Aprove NO token address to the vault
+1. Connects to an already deployed `SiprifiVault`
+2. Calls `addAsset()` with:
+   - The token address (NO or YES)
+   - Its Loan-To-Value (LTV)
+   - Its correlation group
+3. Waits for the transaction to be mined
+4. Confirms that the asset is now accepted by the Vault
+
+Once executed successfully, users can deposit this token as collateral.
+
+---
+
+## scripts/addNoTokenToVault.js (manual mode - MVP 3)
+
+```js
+const hre = require("hardhat");
+
+async function main() {
+  // Address of the deployed SiprifiVault contract
+  const VAULT = "0xE6695a60C5F84fa72F30aD9a2E124E659695D835";
+
+  // Address of the Prediction Market NO token (ERC20)
+  const NO_TOKEN = "0xB43cbFBD61A12e83eAe6113071683Db43233078D";
+
+  // Loan-To-Value: 7500 = 75%
+  const LTV = 7500;
+
+  // Correlation group (YES/NO of same market should share the same group)
+  const GROUP = 0;
+
+  // Get Vault contract instance
+  const vault = await hre.ethers.getContractAt(
+    "SiprifiVault",
+    VAULT
+  );
+
+  // Register the token as collateral
+  const tx = await vault.addAsset(NO_TOKEN, LTV, GROUP);
+  await tx.wait();
+
+  console.log("✅ NO token added to Vault:", NO_TOKEN);
+}
+
+main().catch(console.error);
+```
+
+This contract acts as the primary issuance layer where risk is tokenized into YES and NO shares.
+
 ## Technical Specifications Summary
 
 | Whitepaper Concept        | MVP Status                  |
@@ -97,7 +148,7 @@ The credit facility that issues the protocol's native stablecoin.
 | Outcome risk tokenization | ✅ Implemented              |
 | ERC20 outcome assets      | ✅ Implemented              |
 | Trustless settlement      | ✅ Implemented              |
-| Capital efficiency        | ❌ Not yet                  |
+| Capital efficiency        | ✅ Medium                   |
 | Lending                   | ❌ Future                   |
 | On-chain price discovery  | ❌ Explicitly excluded      |
 
