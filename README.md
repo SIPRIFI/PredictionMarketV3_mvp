@@ -92,10 +92,36 @@ The credit facility that issues the protocol's native stablecoin.
 
 ## Technical Specifications Summary
 
-| Component | Technical Detail |
-| :--- | :--- |
-| **Token Standard** | ERC-20 (OpenZeppelin v5.0) |
-| **Ownership Logic** | `Ownable` pattern for administrative tasks (whitelisting, N-parameter). |
-| **Math** | Integer arithmetic with 18-decimal precision simulation. |
-| **Solvency Assumption** | Base Power minus N-Largest concentration risk. |
-| **Collateral Type** | NO Shares (backed by ETH in the Market contract). |
+| Whitepaper Concept        | MVP Status                  |
+| ------------------------- | --------------------------- |
+| Outcome risk tokenization | ✅ Implemented              |
+| ERC20 outcome assets      | ✅ Implemented              |
+| Trustless settlement      | ✅ Implemented              |
+| Capital efficiency        | ❌ Not yet                  |
+| Lending                   | ❌ Future                   |
+| On-chain price discovery  | ❌ Explicitly excluded      |
+
+> This MVP validates **the atomic unit of Siprifi risk**.
+
+---
+
+## 11. Deployment Notes
+
+* Target: Testnet only
+* Solidity: ^0.8.24
+* No audits
+* No upgradeability
+
+---
+
+## 12. Disclaimer
+
+This code is experimental and unaudited.
+
+* No financial guarantees
+* No oracle protections
+* Use for research and prototyping only
+
+---
+
+**© 2026 Siprifi Finance – Internal MVP Architecture Document**
