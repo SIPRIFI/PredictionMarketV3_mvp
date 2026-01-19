@@ -18,7 +18,8 @@ async function main() {
 
   // 3. Desplegar el Vault de Colateral
   const Vault = await hre.ethers.getContractFactory("SiprifiVault");
-  const vault = await Vault.deploy(await market.getAddress(), await riskEngine.getAddress());
+  // Remove 'await market.getAddress()'
+  const vault = await Vault.deploy(await riskEngine.getAddress());
   await vault.waitForDeployment();
   console.log("SiprifiVault desplegado en:", await vault.getAddress());
 

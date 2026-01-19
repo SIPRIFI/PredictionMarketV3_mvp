@@ -9,7 +9,9 @@ contract MarketToken is ERC20, Ownable {
         string memory name_,
         string memory symbol_,
         address initialOwner
-    ) ERC20(name_, symbol_) Ownable() {
+    ) ERC20(name_, symbol_) { 
+        // En OZ 4.x Ownable() no lleva argumentos.
+        // Transferimos la propiedad manualmente al address recibido:
         _transferOwnership(initialOwner);
     }
 
