@@ -1,8 +1,8 @@
 const hre = require("hardhat");
 
 async function main() {
-  const VAULT = "0xE6695a60C5F84fa72F30aD9a2E124E659695D835";     
-  const NO_TOKEN = "0xB43cbFBD61A12e83eAe6113071683Db43233078D";      
+  const VAULT = "0x7f9DB7FF4E52538Fd25c9d88e68Ed52Cf7221387";     
+  const NO_TOKEN = "0xEa998eac79a8211514260699fE24e8611e83e2C7";      
   const LTV = 7500;                    
   const GROUP = 0;                     
 
@@ -14,7 +14,7 @@ async function main() {
   const tx = await vault.addAsset(NO_TOKEN, LTV, GROUP);
   await tx.wait();
 
-  console.log("✅ NO token añadido al Vault:", NO_TOKEN);
+  console.log("✅ NO token added to Vault:", NO_TOKEN);
 }
 
 main().catch(console.error);

@@ -7,6 +7,7 @@ import "./SiprifiRiskEngine.sol";
 
 contract SiprifiVault is Ownable {
     SiprifiRiskEngine public riskEngine;
+    address public lending; // contrato autorizado
 
     struct AssetConfig {
         bool enabled;
@@ -22,9 +23,19 @@ contract SiprifiVault is Ownable {
     uint256 public constant MAX_GROUPS = 32;
 
     event Deposit(address indexed user, address indexed token, uint256 amount);
+    event Withdraw(address indexed user, address indexed token, uint256 amount);
 
     constructor(address _riskEngine) Ownable() {
         riskEngine = SiprifiRiskEngine(_riskEngine);
+    }
+
+    function setLending(address _lending) external onlyOwner {
+        lending = _lending;
+    }
+
+    modifier onlyLending() {
+        require(msg.sender == lending, "not lending");
+        _;
     }
 
     function addAsset(
@@ -34,40 +45,38 @@ contract SiprifiVault is Ownable {
     ) external onlyOwner {
         require(!assetConfig[token].enabled, "asset exists");
         require(ltv <= LTV_BASE, "invalid ltv");
-        require(correlatedGroup < MAX_GROUPS, "group out of bounds");
+        require(correlatedGroup < MAX_GROUPS, "group out");
 
-        assetConfig[token] = AssetConfig({
-            enabled: true,
-            ltv: ltv,
-            correlatedGroup: correlatedGroup
-        });
-
+        assetConfig[token] = AssetConfig(true, ltv, correlatedGroup);
         supportedAssets.push(token);
     }
 
     function depositCollateral(address token, uint256 amount) external {
-        AssetConfig memory cfg = assetConfig[token];
-        require(cfg.enabled, "asset not supported");
+        require(assetConfig[token].enabled, "asset not supported");
         require(amount > 0, "amount zero");
 
-        bool ok = IERC20(token).transferFrom(
-            msg.sender,
-            address(this),
-            amount
-        );
-        require(ok, "transfer failed");
-
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
         collateralBalance[msg.sender][token] += amount;
 
         emit Deposit(msg.sender, token, amount);
     }
 
-    function getAccountEBP(
+    // 🔐 Withdraw solo autorizado por Lending
+    function withdrawCollateral(
         address user,
-        uint256[] calldata prices
-    ) external view returns (uint256) {
-        require(prices.length == supportedAssets.length, "price length mismatch");
+        address token,
+        uint256 amount
+    ) external onlyLending {
+        collateralBalance[user][token] -= amount;
+        IERC20(token).transfer(user, amount);
+        emit Withdraw(user, token, amount);
+    }
 
+    function getSupportedAssets() external view returns (address[] memory) {
+        return supportedAssets;
+    }
+
+    function getAccountEBP(address user) external view returns (uint256) {
         uint256 baseBorrowingPower;
         uint256[] memory groupExposure = new uint256[](MAX_GROUPS);
 
@@ -77,8 +86,7 @@ contract SiprifiVault is Ownable {
             if (balance == 0) continue;
 
             AssetConfig memory cfg = assetConfig[token];
-            uint256 value = balance * prices[i];
-            uint256 ltvValue = (value * cfg.ltv) / LTV_BASE;
+            uint256 ltvValue = (balance * cfg.ltv) / LTV_BASE;
 
             baseBorrowingPower += ltvValue;
             groupExposure[cfg.correlatedGroup] += ltvValue;
@@ -91,6 +99,7 @@ contract SiprifiVault is Ownable {
 
         uint256[] memory groupValues = new uint256[](count);
         uint256 idx;
+
         for (uint256 i = 0; i < MAX_GROUPS; i++) {
             if (groupExposure[i] > 0) {
                 groupValues[idx++] = groupExposure[i];

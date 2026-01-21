@@ -27,16 +27,18 @@ async function main() {
   await market.setVault(await vault.getAddress());
   console.log("Vault autorizado en el Mercado.");
 
-  // 5. Desplegar el sistema de Préstamos (Lending)
+ // 5. Desplegar el sistema de Préstamos (Lending)
   const Lending = await hre.ethers.getContractFactory("SiprifiLending");
   const lending = await Lending.deploy(await vault.getAddress());
   await lending.waitForDeployment();
   console.log("SiprifiLending desplegado en:", await lending.getAddress());
 
-  console.log("\n--- Despliegue Completo ---");
-}
+  // ❗❗❗ ESTO ES LO QUE FALTABA ❗❗❗
+  await vault.setLending(await lending.getAddress());
+  console.log("Lending autorizado en el Vault");
+ }
 
-main().catch((error) => {
+ main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
