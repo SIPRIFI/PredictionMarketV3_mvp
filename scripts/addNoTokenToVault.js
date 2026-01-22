@@ -14,7 +14,7 @@ async function main() {
   const tx = await vault.addAsset(NO_TOKEN, LTV, GROUP);
   await tx.wait();
 
-  console.log("✅ NO token added to Vault:", NO_TOKEN);
+  console.log("NO token added to Vault:", NO_TOKEN);
 }
 
 main().catch(console.error);
