@@ -10,10 +10,11 @@ contract SiprifiLending {
 
     mapping(address => uint256) public userDebt;
 
+    event Borrowed(address indexed user, uint256 amount);
+    event Repaid(address indexed user, uint256 amount);
+
     constructor(address _vault) {
         vault = SiprifiVault(_vault);
-
-        // Create stablecoin, this contract becomes owner
         stablecoin = new SiprifiStablecoin();
     }
 
@@ -25,22 +26,23 @@ contract SiprifiLending {
 
         userDebt[msg.sender] += amount;
         stablecoin.mint(msg.sender, amount);
+
+        emit Borrowed(msg.sender, amount);
     }
 
     function repay(uint256 amount) external {
         require(amount > 0, "amount zero");
         require(userDebt[msg.sender] > 0, "no debt");
 
-        // User sends sipUSD to this contract
-        stablecoin.transferFrom(msg.sender, address(this), amount);
+        uint256 repayAmount = amount > userDebt[msg.sender]
+            ? userDebt[msg.sender]
+            : amount;
 
-        // Burn from this contract balance
-        stablecoin.burn(address(this), amount);
+        stablecoin.transferFrom(msg.sender, address(this), repayAmount);
+        stablecoin.burn(address(this), repayAmount);
 
-        if (amount >= userDebt[msg.sender]) {
-            userDebt[msg.sender] = 0;
-        } else {
-            userDebt[msg.sender] -= amount;
-        }
+        userDebt[msg.sender] -= repayAmount;
+
+        emit Repaid(msg.sender, repayAmount);
     }
 }

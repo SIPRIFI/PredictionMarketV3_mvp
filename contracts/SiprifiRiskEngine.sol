@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract SiprifiRiskEngine is Ownable {
-    uint256 public N = 1; 
+    uint256 public N = 1;
 
     constructor() Ownable() {}
 
@@ -12,26 +12,45 @@ contract SiprifiRiskEngine is Ownable {
         N = _n;
     }
 
-    function calculateEBP(uint256 baseBorrowingPower, uint256[] memory groupValues) public view returns (uint256) {
-        if (groupValues.length == 0) return baseBorrowingPower;
+    function calculateEBP(
+        uint256 baseBorrowingPower,
+        uint256[] memory groupValues
+    ) public view returns (uint256) {
+
+        // ✅ FIX: si hay 0 o 1 grupos, no hay riesgo de concentración
+        if (groupValues.length <= 1) {
+            return baseBorrowingPower;
+        }
+
         uint256[] memory sorted = _sortDescending(groupValues);
-        uint256 concentrationOffset = 0;
+
+        uint256 concentrationOffset;
         for (uint256 i = 0; i < N && i < sorted.length; i++) {
             concentrationOffset += sorted[i];
         }
-        return (concentrationOffset >= baseBorrowingPower) ? 0 : baseBorrowingPower - concentrationOffset;
+
+        if (concentrationOffset >= baseBorrowingPower) {
+            return 0;
+        }
+
+        return baseBorrowingPower - concentrationOffset;
     }
 
-    function _sortDescending(uint256[] memory arr) internal pure returns (uint256[] memory) {
+    function _sortDescending(
+        uint256[] memory arr
+    ) internal pure returns (uint256[] memory) {
+
         for (uint256 i = 1; i < arr.length; i++) {
             uint256 key = arr[i];
-            int j = int(i) - 1;
-            while (j >= 0 && arr[uint(j)] < key) {
-                arr[uint(j) + 1] = arr[uint(j)];
+            uint256 j = i;
+
+            while (j > 0 && arr[j - 1] < key) {
+                arr[j] = arr[j - 1];
                 j--;
             }
-            arr[uint(j) + 1] = key;
+            arr[j] = key;
         }
+
         return arr;
     }
 }

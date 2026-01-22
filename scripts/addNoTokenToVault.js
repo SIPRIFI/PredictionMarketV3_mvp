@@ -1,8 +1,8 @@
 const hre = require("hardhat");
 
 async function main() {
-  const VAULT = "0x7f9DB7FF4E52538Fd25c9d88e68Ed52Cf7221387";     
-  const NO_TOKEN = "0xEa998eac79a8211514260699fE24e8611e83e2C7";      
+  const VAULT = "0x3C6F1f584456A5f221983a213ceCfF030B3CBd74";     
+  const NO_TOKEN = "0x68C7210B20E9b0B90D3dBc68772c6323a6ceB665";      
   const LTV = 7500;                    
   const GROUP = 0;                     
 
