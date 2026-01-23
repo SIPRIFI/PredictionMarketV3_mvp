@@ -11,7 +11,7 @@ contract SiprifiVault is Ownable {
 
     uint256 public constant LTV_BASE = 10_000;
     uint256 public constant MAX_GROUPS = 32;
-    uint256 public constant MIN_LTV = 100; // 🔒 mínimo 1% para evitar EBP = 0
+    uint256 public constant MIN_LTV = 100;
 
     struct AssetConfig {
         address token;
